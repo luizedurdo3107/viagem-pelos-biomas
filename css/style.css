@@ -32,7 +32,7 @@ button { font-family: 'Outfit', sans-serif; }
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: radial-gradient(ellipse at 30% 50%, #0e441c 0%, #020d05 60%);
+  background: radial-gradient(ellipse at 30% 50%, #0d3d1f 0%, #020d05 60%);
   overflow: hidden;
 }
 
@@ -958,4 +958,31 @@ button { font-family: 'Outfit', sans-serif; }
 /* Controles hint atualizado com F */
 #controls-hint .deforest-key {
   color: #ff8a80;
+}
+
+/* ══ VR Meta Quest — badge e controles ══ */
+.vr-active-badge {
+  position: fixed;
+  bottom: 24px; left: 50%; transform: translateX(-50%);
+  background: rgba(40,10,80,0.88);
+  border: 1px solid rgba(124,77,255,0.55);
+  backdrop-filter: blur(14px);
+  color: #c5b3ff;
+  padding: 10px 24px;
+  border-radius: 100px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 0.8rem;
+  font-weight: 600;
+  z-index: 500;
+  pointer-events: none;
+  white-space: nowrap;
+  max-width: 95vw;
+  text-align: center;
+  animation: vrPulse 3s ease-in-out infinite;
+}
+@keyframes vrPulse { 0%,100%{opacity:1} 50%{opacity:0.55} }
+
+/* Esconde HUD normal dentro do VR (óculos renderiza direto) */
+@media (display-mode: standalone) {
+  #controls-hint, #mode-badge-hud { display: none; }
 }

@@ -358,14 +358,19 @@ function initGame(biomeId){
 
   camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,.1,500);
   camera.position.set(0,1.7,0);
+  // ESSENCIAL para VR: câmera deve ser filha da cena
+  scene.add(camera);
 
-  renderer=new THREE.WebGLRenderer({canvas:cv,antialias:true});
+  renderer=new THREE.WebGLRenderer({canvas:cv, antialias:true, alpha:false});
   renderer.setSize(innerWidth,innerHeight);
   renderer.setPixelRatio(Math.min(devicePixelRatio,2));
   renderer.shadowMap.enabled=true;
   renderer.shadowMap.type=THREE.PCFSoftShadowMap;
   renderer.toneMapping=THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure=1.2;
+  renderer.outputEncoding=THREE.sRGBEncoding;
+  // ESSENCIAL para VR: habilita XR desde o início
+  renderer.xr.enabled=true;
 
   clock=new THREE.Clock();
 
@@ -981,97 +986,110 @@ function onTouchEnd(e){
   }
 }
 
-// ── Loop de animação ──────────────────────────────
+// ── Loop de animação (PC) ────────────────────────
 function animate(){
-  animationFrameId=requestAnimationFrame(animate);
+  animationFrameId = requestAnimationFrame(animate);
   if(!scene||!camera||!renderer||!clock) return;
-  const delta=clock.getDelta(),elapsed=clock.getElapsedTime();
+  const delta   = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
 
-  // Movimento + Camera Bobbing
+  // Movimento PC (WASD + bobbing)
   isMoving = moveForward||moveBack||moveLeft||moveRight;
   if(isMoving){
-    const spd=6;
-    const fwd=new THREE.Vector3(-Math.sin(yaw),0,-Math.cos(yaw));
-    const rgt=new THREE.Vector3( Math.cos(yaw),0,-Math.sin(yaw));
-    if(moveForward) camera.position.addScaledVector(fwd, spd*delta);
-    if(moveBack)    camera.position.addScaledVector(fwd,-spd*delta);
-    if(moveLeft)    camera.position.addScaledVector(rgt,-spd*delta);
-    if(moveRight)   camera.position.addScaledVector(rgt, spd*delta);
-    // Bobbing: balanço natural ao caminhar
+    const spd = 6;
+    const fwd = new THREE.Vector3(-Math.sin(yaw), 0, -Math.cos(yaw));
+    const rgt = new THREE.Vector3( Math.cos(yaw), 0, -Math.sin(yaw));
+    if(moveForward) camera.position.addScaledVector(fwd,  spd*delta);
+    if(moveBack)    camera.position.addScaledVector(fwd, -spd*delta);
+    if(moveLeft)    camera.position.addScaledVector(rgt, -spd*delta);
+    if(moveRight)   camera.position.addScaledVector(rgt,  spd*delta);
     bobbingTime += delta * 9;
-    const bobY = Math.sin(bobbingTime) * 0.055;
-    const bobX = Math.sin(bobbingTime * 0.5) * 0.018;
-    camera.position.y = bobbingBase + bobY;
-    // Leve inclinação lateral ao andar
-    camera.rotation.z = bobX;
+    camera.position.y = bobbingBase + Math.sin(bobbingTime)*0.055;
+    camera.rotation.z = Math.sin(bobbingTime*0.5)*0.018;
   } else {
-    // Volta suavemente à posição base
     bobbingTime *= 0.9;
-    camera.position.y += (bobbingBase - camera.position.y) * 0.12;
+    camera.position.y += (bobbingBase - camera.position.y)*0.12;
     camera.rotation.z *= 0.85;
   }
-  camera.rotation.order='YXZ';
-  camera.rotation.y=yaw;
-  camera.rotation.x=pitch;
+  camera.rotation.order = 'YXZ';
+  camera.rotation.y = yaw;
+  camera.rotation.x = pitch;
 
+  runWorldAnimation(delta, elapsed);
+  renderer.render(scene, camera);
+}
+
+// ── Animações do mundo — partilhado PC e VR ───────
+function runWorldAnimation(delta, elapsed){
   // Ciclo dia/noite
-  dayTime=(dayTime+delta*.008)%1;
-  const angle=dayTime*Math.PI*2;
-  const sun=scene.userData.sun;
+  dayTime = (dayTime + delta*0.008) % 1;
+  const angle = dayTime * Math.PI * 2;
+  const sun = scene.userData.sun;
   if(sun){
-    sun.position.set(Math.cos(angle)*100,Math.sin(angle)*80,30);
-    sun.intensity=Math.max(0,Math.sin(angle))*1.8;
+    sun.position.set(Math.cos(angle)*100, Math.sin(angle)*80, 30);
+    sun.intensity = Math.max(0, Math.sin(angle)) * 1.8;
   }
-  const sk=scene.userData.skyMat;
-  if(sk) sk.uniforms.dayFactor.value=.3+Math.max(0,Math.sin(angle))*.7;
-  if(scene.userData.ambient) scene.userData.ambient.intensity=.3+Math.max(0,Math.sin(angle))*.5;
-  const fill=document.getElementById('time-fill');
-  if(fill) fill.style.width=(dayTime*100)+'%';
-  const icon=document.getElementById('time-icon');
-  if(icon) icon.textContent=dayTime>.25&&dayTime<.75?'☀️':'🌙';
+  const sk = scene.userData.skyMat;
+  if(sk) sk.uniforms.dayFactor.value = 0.3 + Math.max(0,Math.sin(angle))*0.7;
+  if(scene.userData.ambient) scene.userData.ambient.intensity = 0.3 + Math.max(0,Math.sin(angle))*0.5;
+  const fill = document.getElementById('time-fill');
+  if(fill) fill.style.width = (dayTime*100)+'%';
+  const icon = document.getElementById('time-icon');
+  if(icon) icon.textContent = dayTime>0.25&&dayTime<0.75 ? '☀️' : '🌙';
 
   // Animação dos animais
   animals.forEach((a,i)=>{
     if(!a.mesh) return;
-    a.mesh.position.y=a.baseY+Math.sin(elapsed*1.2+i*1.3)*.1;
-    a.mesh.rotation.y+=delta*.4;
-    if(a.mesh.userData.aura) a.mesh.userData.aura.material.opacity=.2+Math.abs(Math.sin(elapsed*1.8+i))*.35;
-    if(a.mesh.userData.label) a.mesh.userData.label.position.y=3.5+Math.sin(elapsed*2+i)*.2;
+    a.mesh.position.y = a.baseY + Math.sin(elapsed*1.2+i*1.3)*0.1;
+    a.mesh.rotation.y += delta*0.4;
+    if(a.mesh.userData.aura)  a.mesh.userData.aura.material.opacity = 0.2+Math.abs(Math.sin(elapsed*1.8+i))*0.35;
+    if(a.mesh.userData.label) a.mesh.userData.label.position.y = 3.5+Math.sin(elapsed*2+i)*0.2;
   });
 
-  // Partículas de clima
+  // Clima
   if(weatherParticles){
-    const pos=weatherParticles.geometry.attributes.position.array;
-    const spd=currentBiome==='pantanal'?.02:.18;
+    const pos = weatherParticles.geometry.attributes.position.array;
+    const spd = currentBiome==='pantanal' ? 0.02 : 0.18;
     for(let i=1;i<pos.length;i+=3){ pos[i]-=spd; if(pos[i]<-1) pos[i]=35; }
-    weatherParticles.geometry.attributes.position.needsUpdate=true;
+    weatherParticles.geometry.attributes.position.needsUpdate = true;
   }
 
   // Cachoeira
   if(scene.userData.waterfall){
-    scene.userData.waterfall.material.opacity=.55+Math.sin(elapsed*3)*.15;
+    scene.userData.waterfall.material.opacity = 0.55+Math.sin(elapsed*3)*0.15;
   }
 
-  // Bússola
-  const needle=document.getElementById('compass-needle');
-  if(needle) needle.style.transform=`rotate(${-yaw*180/Math.PI}deg)`;
+  // Bússola (só PC)
+  const needle = document.getElementById('compass-needle');
+  if(needle) needle.style.transform = `rotate(${-yaw*180/Math.PI}deg)`;
 
-  // Fumaça do desmatamento — sobe e oscila
-  if (deforestationMode) {
-    deforestationObjects.forEach((obj, i) => {
-      if (obj.userData && obj.userData.isSmoke) {
-        obj.position.y += delta * 0.3;
-        obj.material.opacity = Math.max(0, 0.18 - (obj.position.y - 8) * 0.008);
-        if (obj.position.y > 30) obj.position.y = 8;
-        obj.rotation.y += delta * 0.1;
+  // Fumaça desmatamento
+  if(deforestationMode){
+    deforestationObjects.forEach(obj=>{
+      if(obj.userData && obj.userData.isSmoke){
+        obj.position.y += delta*0.3;
+        obj.material.opacity = Math.max(0, 0.18-(obj.position.y-8)*0.008);
+        if(obj.position.y>30) obj.position.y = 8;
+        obj.rotation.y += delta*0.1;
       }
     });
   }
 
+  // Reticle VR — pulsa quando perto de algo interagível
+  if(vrReticle && camera){
+    let nearInteract = false;
+    interactables.forEach(item=>{
+      if(camera.position.distanceTo(item.position) < 6) nearInteract = true;
+    });
+    vrReticle.children.forEach(c=>{
+      if(c.material) c.material.color.setHex(nearInteract ? 0x4caf50 : 0xffffff);
+    });
+    const scale = nearInteract ? 1.4 : 1.0;
+    vrReticle.scale.setScalar(vrReticle.scale.x + (scale - vrReticle.scale.x)*0.15);
+  }
+
   // Proximidade
   checkProximity(elapsed);
-
-  renderer.render(scene,camera);
 }
 
 function checkProximity(elapsed){
@@ -1195,140 +1213,290 @@ function closeAllPanels(){
   ['info-panel','quiz-panel','guide-bubble'].forEach(id=>document.getElementById(id).classList.add('hidden'));
 }
 
-// ── VR ────────────────────────────────────────────
-let vrReticle = null; // mira no centro para VR
-let vrControllers = [];
+// ── VR — Meta Quest 2/3 completo ─────────────────
+let vrReticle       = null;
+let vrControllers   = [];
+let vrGrips         = [];
+let vrGamepads      = [null, null];
+let vrMoveSpeed     = 4.0;   // m/s
+let vrTurnCooldown  = 0;     // snap-turn cooldown
 
-async function enterVR(){
-  if(!navigator.xr){
-    showVRFallback();
-    return;
-  }
-  try{
-    const ok = await navigator.xr.isSessionSupported('immersive-vr');
-    if(!ok){ showVRFallback(); return; }
+// Chamado pelo botão ou automaticamente no modo VR
+async function enterVR() {
+  if (!renderer) { alert('Inicie um bioma antes de entrar no VR!'); return; }
 
+  // Se WebXR não existe no browser
+  if (!navigator.xr) { showVRFallback('WebXR não encontrado neste navegador.'); return; }
+
+  try {
+    const supported = await navigator.xr.isSessionSupported('immersive-vr');
+    if (!supported) { showVRFallback('Este dispositivo não suporta VR imersivo.'); return; }
+
+    // Solicita sessão VR com todos os recursos do Quest
     vrSession = await navigator.xr.requestSession('immersive-vr', {
-      optionalFeatures: ['local-floor','bounded-floor','hand-tracking']
+      requiredFeatures: ['local-floor'],
+      optionalFeatures: ['bounded-floor', 'hand-tracking', 'layers']
     });
 
-    renderer.xr.enabled = true;
+    // renderer.xr.enabled já está true desde initGame
+    renderer.xr.setReferenceSpaceType('local-floor');
     await renderer.xr.setSession(vrSession);
 
-    // Reticle (mira VR no centro)
+    // Substitui o loop de animação pelo loop XR
+    renderer.setAnimationLoop(animateVR);
+    if (animationFrameId) { cancelAnimationFrame(animationFrameId); animationFrameId = null; }
+
+    // Mira central (reticle)
     buildVRReticle();
 
-    // Controladores VR
+    // Controladores Touch do Quest
     setupVRControllers();
 
-    // Badge VR ativo
-    const badge = document.createElement('div');
-    badge.className = 'vr-active-badge';
+    // UI de aviso VR ativo
+    const badge = document.getElementById('vr-active-badge') || document.createElement('div');
     badge.id = 'vr-active-badge';
-    badge.textContent = '🥽 Modo VR Ativo — Use os controles do headset para mover';
+    badge.className = 'vr-active-badge';
+    badge.textContent = '🥽 VR Ativo — Analógico esq=mover | Analógico dir=girar | Trigger=interagir | Squeeze=guia';
     document.body.appendChild(badge);
 
     const btn = document.getElementById('vr-btn');
-    if(btn){ btn.textContent = '🥽 Sair VR'; btn.onclick = exitVR; }
+    if (btn) { btn.textContent = '🥽 Sair VR'; btn.onclick = exitVR; }
 
-    vrSession.addEventListener('end', exitVR);
+    vrSession.addEventListener('end', onVRSessionEnd);
+    console.log('[VR] Session started on Meta Quest');
 
-    console.log('VR session started');
-  } catch(e) {
-    console.error('VR error:', e);
-    showVRFallback(e.message);
+  } catch (err) {
+    console.error('[VR] Error:', err);
+    showVRFallback(err.message);
   }
 }
 
+// Loop de animação DENTRO do VR (chamado pelo renderer.xr automaticamente)
+function animateVR(timestamp, frame) {
+  if (!scene || !camera || !renderer || !clock) return;
+  const delta   = clock.getDelta();
+  const elapsed = clock.getElapsedTime();
+
+  // Lê gamepads do Quest
+  handleVRGamepads(delta);
+
+  // Animações do mundo
+  runWorldAnimation(delta, elapsed);
+
+  // IMPORTANTE: no VR o renderer.render usa a câmera XR automaticamente
+  // quando xr.enabled=true — não precisamos passar a câmera manualmente
+  renderer.render(scene, camera);
+}
+
+// Lê analógicos e botões dos Touch Controllers do Quest 2
+function handleVRGamepads(delta) {
+  const session = renderer.xr.getSession();
+  if (!session) return;
+
+  // XRInputSourceArray não tem forEach com índice — usa loop manual
+  let idx = 0;
+  for(const src of session.inputSources){
+    if(src.gamepad && idx < 2){
+      // Determina qual mão pelo handedness
+      if(src.handedness === 'left')  vrGamepads[0] = src.gamepad;
+      if(src.handedness === 'right') vrGamepads[1] = src.gamepad;
+      idx++;
+    }
+  }
+
+  // ── Controle ESQUERDO: analógico = mover ──
+  const gpL = vrGamepads[0];
+  if (gpL && gpL.axes.length >= 4) {
+    const ax = gpL.axes[2]; // horizontal
+    const ay = gpL.axes[3]; // vertical (para frente/trás)
+    const dead = 0.15;
+
+    if (Math.abs(ax) > dead || Math.abs(ay) > dead) {
+      // Direção baseada na orientação do headset (camera)
+      const headDir = new THREE.Vector3();
+      camera.getWorldDirection(headDir);
+      headDir.y = 0;
+      headDir.normalize();
+
+      const rightDir = new THREE.Vector3();
+      rightDir.crossVectors(headDir, new THREE.Vector3(0, 1, 0));
+
+      // Move em relação a onde o usuário está olhando
+      if (Math.abs(ay) > dead) {
+        camera.position.addScaledVector(headDir, -ay * vrMoveSpeed * delta);
+      }
+      if (Math.abs(ax) > dead) {
+        camera.position.addScaledVector(rightDir, ax * vrMoveSpeed * delta);
+      }
+      // Mantém altura do chão
+      camera.position.y = Math.max(1.2, camera.position.y);
+    }
+  }
+
+  // ── Controle DIREITO: analógico = girar (snap turn) ──
+  const gpR = vrGamepads[1];
+  vrTurnCooldown -= delta;
+  if (gpR && gpR.axes.length >= 4 && vrTurnCooldown <= 0) {
+    const ax = gpR.axes[2];
+    if (Math.abs(ax) > 0.6) {
+      // Snap turn de 30 graus
+      yaw += (ax > 0 ? -1 : 1) * (Math.PI / 6);
+      vrTurnCooldown = 0.35; // evita rotação contínua
+    }
+  }
+
+  // ── Botão A (direito, índice 4) = Interagir ──
+  if (gpR && gpR.buttons[4] && gpR.buttons[4].pressed) {
+    interact();
+  }
+  // ── Botão B (direito, índice 5) = Guia ──
+  if (gpR && gpR.buttons[5] && gpR.buttons[5].pressed) {
+    showGuide();
+  }
+  // ── Botão X (esquerdo, índice 4) = Quiz ──
+  if (gpL && gpL.buttons[4] && gpL.buttons[4].pressed) {
+    showQuiz();
+  }
+}
+
+// Mira no centro do campo de visão VR
+function buildVRReticle() {
+  if (vrReticle) {
+    // Remove da câmera anterior se existir
+    if(vrReticle.parent) vrReticle.parent.remove(vrReticle);
+  }
+
+  const g = new THREE.Group();
+
+  // Anel externo branco
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(0.012, 0.018, 32),
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.9, side: THREE.DoubleSide, depthTest: false })
+  );
+  g.add(ring);
+
+  // Ponto central verde
+  const dot = new THREE.Mesh(
+    new THREE.CircleGeometry(0.004, 16),
+    new THREE.MeshBasicMaterial({ color: 0x4caf50, side: THREE.DoubleSide, depthTest: false })
+  );
+  g.add(dot);
+
+  g.position.set(0, 0, -1.5); // 1.5m à frente da câmera
+  g.renderOrder = 999; // sempre na frente
+
+  // Adiciona à câmera XR (que o Quest controla)
+  camera.add(g);
+  vrReticle = g;
+}
+
+// Controladores Touch com raios visuais
+function setupVRControllers() {
+  vrControllers.forEach(c => scene.remove(c));
+  vrGrips.forEach(g => scene.remove(g));
+  vrControllers = []; vrGrips = [];
+
+  [0, 1].forEach(i => {
+    // Controller ray
+    const ctrl = renderer.xr.getController(i);
+    ctrl.addEventListener('selectstart', () => interact());
+    ctrl.addEventListener('squeezestart', () => showGuide());
+
+    // Raio visual verde
+    const rayGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(0, 0, -3)
+    ]);
+    const ray = new THREE.Line(rayGeo, new THREE.LineBasicMaterial({
+      color: 0x4caf50, transparent: true, opacity: 0.5
+    }));
+    ctrl.add(ray);
+
+    scene.add(ctrl);
+    vrControllers.push(ctrl);
+
+    // Grip (modelo da mão/controle)
+    const grip = renderer.xr.getControllerGrip(i);
+
+    // Modelo simples do controle Touch
+    const handleMat = new THREE.MeshLambertMaterial({ color: i === 0 ? 0x3355ff : 0xff3333 });
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.014, 0.12, 10), handleMat);
+    handle.rotation.x = Math.PI / 4;
+    grip.add(handle);
+
+    const button = new THREE.Mesh(
+      new THREE.SphereGeometry(0.012, 8, 6),
+      new THREE.MeshLambertMaterial({ color: 0xffffff })
+    );
+    button.position.set(0, 0.06, -0.02);
+    grip.add(button);
+
+    scene.add(grip);
+    vrGrips.push(grip);
+  });
+}
+
+function onVRSessionEnd() {
+  exitVR();
+}
+
+function exitVR() {
+  // Para o loop VR e volta ao normal
+  renderer.setAnimationLoop(null);
+  if (!animationFrameId) animate(); // retoma loop PC
+
+  if (vrSession) { try { vrSession.end(); } catch(e) {} vrSession = null; }
+  if (renderer) renderer.xr.enabled = false;
+
+  vrControllers.forEach(c => scene.remove(c));
+  vrGrips.forEach(g => scene.remove(g));
+  vrControllers = []; vrGrips = [];
+
+  if (vrReticle) { camera.remove(vrReticle); vrReticle = null; }
+  vrGamepads = [null, null];
+
+  const badge = document.getElementById('vr-active-badge');
+  if (badge) badge.remove();
+
+  const btn = document.getElementById('vr-btn');
+  if (btn) { btn.textContent = '🥽 VR'; btn.onclick = enterVR; }
+}
+
 function showVRFallback(msg) {
-  const m = msg || 'WebXR não disponível';
+  // Remove existente
+  const old = document.getElementById('vr-fallback');
+  if (old) old.remove();
+
   const div = document.createElement('div');
+  div.id = 'vr-fallback';
   div.style.cssText = `
     position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
-    background:rgba(0,0,0,0.92);border:1px solid rgba(124,77,255,0.4);
-    border-radius:20px;padding:36px 40px;text-align:center;
-    color:#fff;font-family:'Outfit',sans-serif;z-index:500;max-width:440px;
+    background:rgba(5,5,20,0.96);border:1px solid rgba(124,77,255,0.45);
+    border-radius:22px;padding:36px 40px;text-align:center;
+    color:#fff;font-family:'Outfit',sans-serif;z-index:600;max-width:460px;width:90%;
+    box-shadow:0 0 60px rgba(124,77,255,0.3);
   `;
   div.innerHTML = `
-    <div style="font-size:3rem;margin-bottom:16px">🥽</div>
-    <h3 style="font-size:1.3rem;margin-bottom:12px;color:#b39ddb">Modo VR</h3>
-    <p style="color:rgba(255,255,255,0.65);font-size:0.9rem;line-height:1.7;margin-bottom:20px">
-      Para usar o modo VR, abra este link <strong>diretamente no navegador do seu headset</strong>
-      (Meta Browser, Firefox Reality, Wolvic) e clique em 🥽 VR.<br><br>
-      <small style="color:rgba(255,255,255,0.4)">${m}</small>
+    <div style="font-size:3.5rem;margin-bottom:14px">🥽</div>
+    <h3 style="font-size:1.25rem;margin-bottom:10px;color:#b39ddb">Como usar o VR</h3>
+    <p style="color:rgba(255,255,255,0.65);font-size:0.88rem;line-height:1.75;margin-bottom:8px">
+      <strong style="color:#fff">No Meta Quest 2/3:</strong><br>
+      1. Faça o deploy no Netlify<br>
+      2. Abra o <strong>Meta Browser</strong> nos óculos<br>
+      3. Digite a URL do site<br>
+      4. Clique no botão <strong>🥽 VR</strong>
     </p>
-    <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-      <button onclick="this.parentElement.parentElement.remove()" style="
-        background:#4caf50;border:none;color:#fff;padding:10px 24px;
-        border-radius:100px;cursor:pointer;font-family:Outfit,sans-serif;font-weight:600">
-        Continuar no PC
+    <p style="color:rgba(255,255,255,0.35);font-size:0.75rem;margin-bottom:22px">${msg || ''}</p>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+      <button onclick="document.getElementById('vr-fallback').remove()" style="
+        background:#4caf50;border:none;color:#fff;padding:11px 26px;
+        border-radius:100px;cursor:pointer;font-family:Outfit,sans-serif;
+        font-weight:700;font-size:0.92rem;">
+        Continuar no PC / Notebook
       </button>
     </div>
   `;
   document.body.appendChild(div);
-}
-
-function buildVRReticle() {
-  if(vrReticle){ scene.remove(vrReticle); }
-  const geo = new THREE.RingGeometry(0.02, 0.04, 32);
-  const mat = new THREE.MeshBasicMaterial({ color: 0xffffff, opacity: 0.8, transparent: true, side: THREE.DoubleSide });
-  vrReticle = new THREE.Mesh(geo, mat);
-  vrReticle.position.set(0, 0, -2); // 2m à frente
-  vrReticle.rotation.x = -Math.PI / 2;
-  camera.add(vrReticle); // segue a câmera (olhar)
-  scene.add(camera);
-}
-
-function setupVRControllers() {
-  vrControllers = [];
-  [0, 1].forEach(i => {
-    const ctrl = renderer.xr.getController(i);
-    ctrl.addEventListener('selectstart', onVRSelect);
-    ctrl.addEventListener('squeezestart', onVRSqueeze);
-    scene.add(ctrl);
-
-    // Mão/ray visual
-    const ray = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.004, 0.004, 0.5, 8),
-      new THREE.MeshBasicMaterial({ color: 0x4caf50, opacity: 0.6, transparent: true })
-    );
-    ray.rotation.x = Math.PI / 2;
-    ray.position.z = -0.25;
-    ctrl.add(ray);
-
-    // Dot na ponta
-    const dot = new THREE.Mesh(
-      new THREE.SphereGeometry(0.01, 8, 6),
-      new THREE.MeshBasicMaterial({ color: 0xffffff })
-    );
-    dot.position.z = -0.5;
-    ctrl.add(dot);
-
-    vrControllers.push(ctrl);
-  });
-}
-
-function onVRSelect() {
-  // Trigger = interagir com o que estiver na mira
-  interact();
-}
-function onVRSqueeze() {
-  // Squeeze = abrir guia
-  showGuide();
-}
-
-function exitVR(){
-  if(vrSession){ try{ vrSession.end(); }catch(e){} vrSession = null; }
-  if(renderer) renderer.xr.enabled = false;
-  vrControllers.forEach(c => scene.remove(c));
-  vrControllers = [];
-  if(vrReticle){ camera.remove(vrReticle); vrReticle = null; }
-
-  const badge = document.getElementById('vr-active-badge');
-  if(badge) badge.remove();
-
-  const btn = document.getElementById('vr-btn');
-  if(btn){ btn.textContent = '🥽 VR'; btn.onclick = enterVR; }
 }
 
 // ── Modo Desmatamento ────────────────────────────
@@ -1540,107 +1708,3 @@ function onResize(){
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth,innerHeight);
 }
-
-function showScreen(id){
-  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-  const s=document.getElementById(id);
-  if(s) s.classList.add('active');
-}
- 
-function init(){
-  // Configurações iniciais
-  scene=new THREE.Scene();
-  camera=new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,1000);
-  renderer=new THREE.WebGLRenderer({canvas:document.getElementById('game-canvas'),antialias:true});
-  renderer.setSize(innerWidth,innerHeight);
-  renderer.shadowMap.enabled=true;
-  clock=new THREE.Clock();
-
-  // Luz ambiente
-  const ambient=new THREE.AmbientLight(0xffffff,0.5);
-  scene.add(ambient);
-  scene.userData.ambient=ambient;
-
-  // Luz direcional (sol)
-  const sun=new THREE.DirectionalLight(0xffffff,1.8);
-  sun.position.set(100,80,30);
-  sun.castShadow=true;
-  sun.shadow.mapSize.width=1024;
-  sun.shadow.mapSize.height=1024;
-  sun.shadow.camera.near=0.5;
-  sun.shadow.camera.far=200;
-  sun.shadow.camera.left=-50;
-  sun.shadow.camera.right=50;
-  sun.shadow.camera.top=50;
-  sun.shadow.camera.bottom=-50;
-  scene.add(sun);
-  scene.userData.sun=sun;
-
-  // Fundo do céu
-  const skyGeo=new THREE.SphereGeometry(500,32,15);
-  const skyMat=new THREE.ShaderMaterial({
-    uniforms:{
-      topColor:{value:new THREE.Color(0x87ceeb)},
-      botColor:{value:new THREE.Color(0xb0e0e6)},
-      dayFactor:{value:0.7}
-    },
-    vertexShader:`
-      varying vec3 vPos;
-      void main(){
-        vPos=position;
-        gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0);
-      }
-    `,
-    fragmentShader:`
-      uniform vec3 topColor;
-      uniform vec3 botColor;
-      uniform float dayFactor;
-      varying vec3 vPos;
-      void main(){
-        float h=(vPos.y+250.0)/500.0;
-        vec3 col=mix(botColor,topColor,h)*dayFactor;
-        gl_FragColor=vec4(col,1.0);
-      }
-    `,
-    side:THREE.BackSide
-  });
-  const sky=new THREE.Mesh(skyGeo,skyMat);
-  scene.add(sky);
-  scene.userData.skyMat=skyMat;
-
-  // Carrega o bioma inicial
-  loadBiome(currentBiome);
-
-  // Controles
-  setupControls();
-
-  // Botão de desmatamento
-  buildDeforestButton();
-
-  // Animação
-  animate();
-
-  // Responsividade
-  window.addEventListener('resize',onResize);
-} 
-
-window.onloadstart=init;
-function onLoadStart(){
-  const loader=document.getElementById('loader');
-  if(loader) loader.style.display='block';
-}
-function onLoadComplete(){
-  const loader=document.getElementById('loader');
-  if(loader) loader.style.display='none';
-  showScreen('screen-game');
-}
-      
-function onLoadProgress(progress){
-  const loader=document.getElementById('loader');
-  if(loader){
-    const bar=loader.querySelector('.loader-bar');
-    if(bar) bar.style.width=(progress*100)+'%';
-  }
-} 
-
-

@@ -309,8 +309,3 @@ function inGame() {
   const s = document.getElementById('screen-game');
   return s && s.classList.contains('active');
 }
-function toggleInGame(val) {
-  const s = document.getElementById('screen-game');
-  if (s) s.classList.toggle('active', val);
-}
-false && console.log('Controles carregados');
