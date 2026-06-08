@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Viagem pelos Biomas</title>
+  <link rel="stylesheet" href="css/style.css" />
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════
+     TELA 1: INTRODUÇÃO
+══════════════════════════════════════ -->
+<div id="screen-intro" class="screen active">
+  <canvas id="particles-canvas"></canvas>
+  <div class="intro-content">
+    <div class="logo-container">
+      <div class="logo-leaf">🌿</div>
+      <h1 class="logo-title">Viagem pelos<br><span>Biomas</span></h1>
+      <p class="logo-subtitle">Uma jornada imersiva pelos ecossistemas brasileiros</p>
+    </div>
+    <div class="intro-badges">
+      <span class="badge">🎓 Educativo</span>
+      <span class="badge">🥽 VR Ready</span>
+      <span class="badge">🌱 Preservação</span>
+    </div>
+    <button class="btn-start" onclick="showModeSelect()">
+      <span class="btn-icon">🚀</span>
+      Iniciar Exploração
+    </button>
+    <p class="intro-hint">6 biomas brasileiros para explorar</p>
+  </div>
+</div>
+<button> clique aq pare escolher o bioma </button>
+<footer>
+  <p>Desenvolvido por [Seu Nome] | Dados e informações baseados em fontes confiáveis sobre os biomas brasileiros</p>
+</footer>
+<!-- ══════════════════════════════════════
+     TELA 2: ESCOLHA DO MODO
+══════════════════════════════════════ -->
+<div id="screen-mode" class="screen">
+  <canvas id="particles-canvas-2"></canvas>
+  <div class="mode-content">
+
+    <button class="btn-back-mode" onclick="showIntro()">← Voltar</button>
+
+    <div class="mode-header">
+      <div class="mode-header-leaf">🌿</div>
+      <h2 class="mode-title">Como deseja explorar?</h2>
+      <p class="mode-subtitle">Escolha o modo de jogo que melhor se adapta a você</p>
+    </div>
+
+    <div class="mode-cards">
+
+      <div class="mode-card" onclick="selectMode('pc')">
+        <div class="mode-icon-wrap" style="background:rgba(76,175,80,0.12);border-color:rgba(76,175,80,0.3)">
+          <span class="mode-icon">🖥️</span>
+        </div>
+        <h3 class="mode-name">Computador</h3>
+        <p class="mode-desc">Explore os biomas com teclado e mouse direto no navegador, sem nenhum equipamento especial.</p>
+        <ul class="mode-features">
+          <li><span class="feat-icon">⌨️</span> WASD ou setas para mover</li>
+          <li><span class="feat-icon">🖱️</span> Botão direito do mouse para olhar</li>
+          <li><span class="feat-icon">🎮</span> Botões na tela para interagir</li>
+          <li><span class="feat-icon">📱</span> Funciona no celular também</li>
+        </ul>
+        <div class="mode-tags">
+          <span class="mode-tag green">✅ Recomendado</span>
+          <span class="mode-tag neutral">Sem equipamento</span>
+        </div>
+        <div class="mode-cta" style="background:linear-gradient(135deg,#4caf50,#2e7d32)">Jogar no Computador →</div>
+      </div>
+
+      <div class="mode-card" onclick="selectMode('vr')">
+        <div class="mode-icon-wrap" style="background:rgba(124,77,255,0.12);border-color:rgba(124,77,255,0.3)">
+          <span class="mode-icon">🥽</span>
+        </div>
+        <h3 class="mode-name">Realidade Virtual</h3>
+        <p class="mode-desc">Mergulhe de verdade nos biomas com óculos VR para uma experiência completamente imersiva.</p>
+        <ul class="mode-features">
+          <li><span class="feat-icon">🥽</span> Meta Quest 2 / 3 / Pro</li>
+          <li><span class="feat-icon">🎮</span> HTC Vive / Valve Index</li>
+          <li><span class="feat-icon">📱</span> Celular + óculos cardboard</li>
+          <li><span class="feat-icon">🌐</span> Tecnologia WebXR nativa</li>
+        </ul>
+        <div class="mode-tags">
+          <span class="mode-tag purple">🥽 Imersivo</span>
+          <span class="mode-tag neutral">Requer headset</span>
+        </div>
+        <div class="mode-cta" style="background:linear-gradient(135deg,#7c4dff,#4527a0)">Jogar em VR →</div>
+      </div>
+
+    </div>
+
+    <div class="vr-tip" id="vr-tip">
+      <span class="vr-tip-icon">💡</span>
+      <span><strong>Dica VR:</strong> Abra este jogo no navegador do seu headset (Meta Browser, Firefox Reality) e clique em "Jogar em VR" para entrar no modo imersivo automaticamente.</span>
+      <button onclick="document.getElementById('vr-tip').style.display='none'">✕</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TELA 3: ESCOLHA DO BIOMA
+══════════════════════════════════════ -->
+<div id="screen-select" class="screen">
+  <div class="select-header">
+    <button class="btn-back" onclick="showModeSelect()">← Voltar</button>
+    <h2>Escolha seu Bioma</h2>
+    <p id="select-mode-label"></p>
+  </div>
+  <div class="biomes-grid">
+
+    <div class="biome-card" onclick="startGame('amazonia')" style="--card-color:#1a5e2a">
+      <div class="biome-emoji">🌳</div>
+      <h3>Amazônia</h3>
+      <p>Floresta densa, rios imensos e a maior biodiversidade do planeta</p>
+      <div class="biome-tags"><span>Chuva</span><span>Onças</span><span>Araras</span></div>
+    </div>
+
+    <div class="biome-card" onclick="startGame('cerrado')" style="--card-color:#8B6914">
+      <div class="biome-emoji">🌾</div>
+      <h3>Cerrado</h3>
+      <p>Savana brasileira com árvores retorcidas e fauna singular</p>
+      <div class="biome-tags"><span>Queimadas</span><span>Tamanduá</span><span>Lobo-guará</span></div>
+    </div>
+
+    <div class="biome-card" onclick="startGame('caatinga')" style="--card-color:#B5651D">
+      <div class="biome-emoji">🌵</div>
+      <h3>Caatinga</h3>
+      <p>Semiárido brasileiro com flora resistente à seca extrema</p>
+      <div class="biome-tags"><span>Seca</span><span>Cactos</span><span>Mandacaru</span></div>
+    </div>
+
+    <div class="biome-card" onclick="startGame('pantanal')" style="--card-color:#1565C0">
+      <div class="biome-emoji">🐊</div>
+      <h3>Pantanal</h3>
+      <p>A maior planície alagável do mundo com rica vida aquática</p>
+      <div class="biome-tags"><span>Lagos</span><span>Jacaré</span><span>Capivara</span></div>
+    </div>
+
+    <div class="biome-card" onclick="startGame('mata-atlantica')" style="--card-color:#2E7D32">
+      <div class="biome-emoji">💧</div>
+      <h3>Mata Atlântica</h3>
+      <p>Floresta úmida com cachoeiras e enorme biodiversidade</p>
+      <div class="biome-tags"><span>Cachoeira</span><span>Mico-leão</span><span>Bromélias</span></div>
+    </div>
+
+    <div class="biome-card" onclick="startGame('pampa')" style="--card-color:#5D6B2A">
+      <div class="biome-emoji">🌬️</div>
+      <h3>Pampa</h3>
+      <p>Campos gaúchos com ventos fortes e campos abertos</p>
+      <div class="biome-tags"><span>Vento</span><span>Ema</span><span>Arroio</span></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     TELA 4: JOGO 3D
+══════════════════════════════════════ -->
+<div id="screen-game" class="screen">
+
+  <!-- Canvas Three.js — atrás de tudo no jogo -->
+  <canvas id="game-canvas"></canvas>
+
+  <!-- HUD superior -->
+  <div id="hud">
+    <div class="hud-top">
+      <button class="hud-btn" onclick="showModeSelectFromGame()">🗺️ Menu</button>
+      <div id="biome-name-hud"></div>
+      <button class="hud-btn" id="vr-btn" onclick="enterVR()">🥽 VR</button>
+    </div>
+    <div class="hud-compass"><div id="compass-needle">↑</div></div>
+    <div class="hud-time">
+      <div id="time-icon">☀️</div>
+      <div id="time-bar"><div id="time-fill"></div></div>
+    </div>
+  </div>
+
+  <!-- Modo badge -->
+  <div id="mode-badge-hud"></div>
+
+  <!-- Crosshair -->
+  <div id="crosshair">+</div>
+
+  <!-- Hint de controles -->
+  <div id="controls-hint"></div>
+
+  <!-- Botões de ação rápida -->
+  <div id="action-buttons">
+    <button class="action-btn" onclick="interact()" title="Interagir (E)">
+      <span class="action-icon">🔍</span>
+      <span class="action-label">Interagir</span>
+    </button>
+    <button class="action-btn" onclick="showQuiz()" title="Quiz (Q)">
+      <span class="action-icon">🎯</span>
+      <span class="action-label">Quiz</span>
+    </button>
+    <button class="action-btn" onclick="showGuide()" title="Guia (G)">
+      <span class="action-icon">🧑‍🌿</span>
+      <span class="action-label">Guia</span>
+    </button>
+    <button class="action-btn" onclick="closeAllPanels()" title="Fechar (Esc)">
+      <span class="action-icon">✕</span>
+      <span class="action-label">Fechar</span>
+    </button>
+  </div>
+
+  <!-- Painel de info -->
+  <div id="info-panel" class="hidden">
+    <button class="close-panel" onclick="closePanel()">✕</button>
+    <div id="info-emoji"></div>
+    <h3 id="info-title"></h3>
+    <p id="info-text"></p>
+    <div id="info-status"></div>
+  </div>
+
+  <!-- Quiz -->
+  <div id="quiz-panel" class="hidden">
+    <h3>🎯 Quiz do Bioma</h3>
+    <p id="quiz-question"></p>
+    <div id="quiz-options"></div>
+    <div id="quiz-result"></div>
+  </div>
+
+  <!-- Guia NPC -->
+  <div id="guide-bubble" class="hidden">
+    <div class="guide-avatar">🧑‍🌿</div>
+    <div class="guide-text">
+      <p id="guide-message"></p>
+      <button onclick="nextGuideMessage()">Próximo →</button>
+    </div>
+  </div>
+
+  <!-- Popup de descoberta -->
+  <div id="discovery-popup" class="hidden">
+    <div class="discovery-inner">
+      <div id="discovery-emoji"></div>
+      <h3>Descoberta!</h3>
+      <p id="discovery-text"></p>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══════════════════════════════════════
+     TELA 5: IMPACTO AMBIENTAL
+══════════════════════════════════════ -->
+<div id="screen-impact" class="screen">
+  <div class="impact-content">
+    <h2>⚠️ Impacto Ambiental</h2>
+    <p id="impact-text"></p>
+    <button onclick="hideImpact()">Continuar explorando</button>
+  </div>
+</div>
+<script src="js/game.js"></script>
+<script src="js/controls.js"></script>
+</body>
+</html>
